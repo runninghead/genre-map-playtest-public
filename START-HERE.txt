@@ -1,0 +1,22 @@
+Genre Map Game — Build 23 Sep F
+
+LOCAL: Extract and serve this folder over HTTP (VS Code Live Preview, or
+python3 -m http.server 8000 then http://localhost:8000). Do not use file://.
+
+GITHUB PAGES:
+1. Create a repository (for example genre-map-game). GitHub Free requires a
+   public repository for Pages; the source, questions and images will be public.
+2. Upload these extracted files and the images folder to the repository root,
+   not the ZIP or a wrapping folder. Commit to main.
+3. Settings > Pages > Deploy from a branch > main > /(root) > Save.
+4. Wait for deployment, then open the URL shown on that settings page.
+5. Test CSV/image loading, scoring, rollover links, IMDb and optional sound.
+
+PLAY-TEST: Crime > Mark reviewed > Heist. Wrong answer then right answer
+should earn one point, even after closing/reopening the card. Completed
+questions must not increase the total again. Nine points earns a Skip.
+Sound starts on after interaction; use Sound: off to mute. No background music.
+
+LIMITS: Progress resets on reload. No Google Sheets results or accounts yet.
+22 cards, 8 questions. Visual/audio checks across browsers are still needed.
+Google Drive can share this ZIP but does not host the playable website.

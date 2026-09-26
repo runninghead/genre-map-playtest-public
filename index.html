@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Genre Map Game - Vanilla JS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #909090;
+    --panel: #fafaf6;
+    --panel-2: #1e2130;
+    --text: #6a6a6a;
+    --muted: #6e7b8f;
+    --accent: #64d2ff;
+    --genre: #6ad4a8;
+    --sub: #ffd166;
+    --hybrid: #bd93f9;
+    --locked: #3a3f54;
+    --ok: #73e2a7;
+    --warn: #ffaf87;
+    --bad: #ef6b73;
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    /* background: linear-gradient(180deg, #0c0d12 0%, #0e0f13 100%); */
+    color: var(--text);
+    font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+  header {
+    padding: 12px 16px;
+    background: #121320;
+    border-bottom: 1px solid #212336;
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .pill { padding: 6px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); font-size: 13px; }
+  .score { color: var(--text); }
+  .legend { display: flex; gap: 8px; align-items: center; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; vertical-align: -1px; margin-right: 6px; }
+  .grid-wrap { position: relative; padding: 16px; }
+  #linksSvg { position: absolute; inset: 0; pointer-events: none; }
+
+h3 {
+    color: rgb(43, 87, 112);
+}
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid #c5c5c5;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    position: relative;
+    transition: transform .15s ease, border-color .15s ease;
+    cursor: pointer;
+    outline: none;
+  }
+  .card:hover { transform: translateY(-2px); border-color: #2e3350; }
+  .card.locked { background: #151726; border-color: #232742; cursor: not-allowed; }
+  .card.locked .title, .card.locked .subtitle, .card.locked p { color: #7b83a3; }
+  .badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .badge {
+    font-size: 11px; color: #0b1020; background: #d6e4ff; padding: 3px 6px; border-radius: 999px;
+  }
+  .title { margin: 0; font-size: 16px; font-weight: 700; }
+  .subtitle { margin: 0; font-size: 13px; color: var(--muted); }
+  .type {
+    position: absolute; top: 10px; right: 10px; font-size: 10px; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; letter-spacing: .06em; color: #09101a;
+  }
+  .type.genre { background: var(--genre); }
+  .type.sub { background: var(--sub); }
+  .type.hybrid { background: var(--hybrid); }
+  .example {
+    display: grid; grid-template-columns: 36px 1fr; gap: 8px; align-items: center; margin-top: 8px;
+  }
+  .thumb { width: 36px; height: 54px; background: #ff2ae3; border-radius: 4px; background-position: center; background-size: cover; }
+  .example small { color: var(--muted); }
+  .lockStrip {
+    position: absolute; inset: auto 0 0 0; height: 30px; border-radius: 0 0 12px 12px;
+    background: linear-gradient(90deg, #2b2f45, #20243b); color: #c8cede;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+  }
+
+  .card:focus-visible, .btn:focus-visible, .options button:focus-visible { outline: 3px solid #1671a3; outline-offset: 3px; }
+  header { color: #e5e9ff; }
+  header .score, header .pill { color: #c8cede; }
+  .options button, .options input[type="text"] { color: #e5e9ff; }
+  .card.locked .example { color: #aeb8d2; }
+  .type { position: static; display: inline-block; margin-bottom: 6px; }
+  .card.completed { border-color: #278059; }
+  .map-tools { padding: 12px 16px; background: #f0f3f6; color: #273648; }
+  .map-tools select { padding: 8px; max-width: 100%; font: inherit; }
+  .map-tools p { margin: 8px 0 0; }
+  .grid { z-index: auto; }
+  .card { z-index: 1; border-width: 3px; }
+  .card:hover { transform: none; }
+  #linksSvg { z-index: 0; }
+  .grid-wrap.focused #linksSvg { z-index: 2; }
+  .grid-wrap.focused .card { opacity: .65; }
+  .grid-wrap.focused .card.related { opacity: 1; z-index: 3; }
+  .card.selected { outline: 3px solid #1765a2; outline-offset: 2px; }
+  .card.status-answer { border-color: #237447; }
+  .card.status-retry { border-color: #966000; border-style: dashed; }
+  .card.status-skip { border-color: #7053a0; border-style: dashed; }
+  .card.status-read { border-color: #527180; }
+  .card.newly-unlocked { box-shadow: 0 0 0 4px #efb82c; }
+  .card-state { display: block; font-size: 12px; font-weight: 600; margin-top: 9px; color: #34485a; }
+  .card.locked .card-state { color: #c8cede; margin-bottom: 22px; }
+  .type { position: absolute; top: 9px; left: 9px; right: auto; margin: 0; font-size: 11px; padding: 3px 5px; }
+  .card .title { margin: 0 28px 4px; }
+  .card-state { font-size: 16px; margin-top: 6px; }
+  .badge[data-definition] { cursor: help; }
+  .term-tip { position: fixed; z-index: 2000; max-width: min(270px, 85vw); padding: 8px 10px; background: #162638; color: #fff; border-radius: 6px; font: 14px/1.4 system-ui; pointer-events: none; box-shadow: 0 2px 8px #0004; }
+  button.chip { font: inherit; font-size: 12px; border: 1px solid #657089; cursor: help; }
+  button.chip:focus-visible { outline: 3px solid #1671a3; outline-offset: 2px; }
+  #termDefinition { margin: 0 0 8px; font-size: 14px; color: #34485a; }
+  .card { text-align: center; font: 13px/1.45 system-ui, sans-serif; color: #111; }
+  .card-open { font: inherit; font-weight: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  .card-open:disabled { cursor: not-allowed; }
+  .card-open:focus-visible, a.thumb:focus-visible { outline: 3px solid #1765a2; outline-offset: 3px; }
+  .card .example { grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .card .example > div { min-width: 0; overflow-wrap: anywhere; }
+  .card-state { display: flex; gap: 3px; align-items: center; align-self: end; margin: 0; font-size: 21px; }
+  .status-symbol { color: #075ac4; font-weight: 800; }
+  .status-star { color: #c76a00; font-size: 23px; }
+  .status-answer .status-symbol { color: #237447; }
+  .status-retry .status-symbol { color: #966000; }
+  .status-skip .status-symbol { color: #7053a0; }
+  .card.locked .example { padding-bottom: 22px; }
+  .card.locked .card-state { margin-bottom: 0; }
+  a.thumb { display: block; cursor: pointer; }
+  .connection-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; }
+  .connection-key span::before { content: ''; display: inline-block; width: 22px; border-top: 3px solid var(--line); margin-right: 6px; vertical-align: middle; }
+  @keyframes unlockPulse {
+    0%, 100% { box-shadow: 0 0 0 3px #d69a18; }
+    50% { box-shadow: 0 0 0 6px #efb82c80, 0 0 16px #efb82c66; }
+  }
+  .card.newly-unlocked { animation: unlockPulse 1.6s ease-in-out 3; }
+  body.modal-open .card.newly-unlocked { animation-play-state: paused; }
+  @media (prefers-reduced-motion: reduce) { .card.newly-unlocked { animation: none; } }
+  #skipHelp { color: #46556a; }
+  #useSkip.skip-ready { background: #13693f; color: #fff; border: 2px solid #64cc93; box-shadow: 0 0 0 3px #64cc9333; }
+  #useSkip.skip-earned { background: #13693f; color: #fff; opacity: 1; border-color: #64cc93; }
+  header .perk-ready { background: #13693f; color: white; border: 2px solid #64cc93; }
+  .card.skip-candidate { outline: 3px dashed #13693f; outline-offset: 2px; }
+  .scoreboard { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; padding: 10px 16px; background: #14283d; color: #f7fbff; box-shadow: 0 3px 8px #0003; }
+  .score-total { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
+  .score-total strong { font-size: 34px; line-height: 1; color: #8ff0bc; }
+  .score-total span { font-size: 13px; }
+  .score-progress { display: grid; gap: 2px; flex: 1; min-width: 180px; font-size: 13px; }
+  .score-progress progress { width: 100%; max-width: 360px; height: 10px; accent-color: #76dca4; }
+  #scoreFeedback { margin: 0; flex-basis: 100%; font-size: 14px; min-height: 1.45em; }
+  .modal-score { color: #175237; font-size: 20px; font-weight: 700; margin: 6px 0; }
+  .score-total.reward { animation: scoreReward .65s ease-out; }
+  @keyframes scoreReward { 50% { transform: scale(1.1); } }
+  @media (prefers-reduced-motion: reduce) { .score-total.reward { animation: none; } }
+  .card { scroll-margin-top: 160px; }
+  .grid-wrap.focused #linksSvg { z-index: 4; }
+  .grid-wrap.focused .card.connection-root { z-index: 5; }
+  /* Modal */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center; z-index: 999;
+  }
+  .modal {
+    width: min(820px, 92vw); max-height: 88vh; overflow: auto;
+    background: var(--panel); border: 1px solid #2a2e47; border-radius: 14px; padding: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal h2 { margin: 0 0 4px 0; }
+  .modal .muted { color: var(--muted); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px 0; }
+  .chip { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: #2a2f47; color: #c8cede; }
+  .qbox { margin-top: 8px; border-top: 1px dashed #2b304d; padding-top: 10px; }
+  .options { display: grid; gap: 8px; margin: 10px 0; }
+  .options button, .options input[type="text"] {
+    background: #1c2033; border: 1px solid #2b304d; color: var(--text);
+    padding: 10px 12px; border-radius: 10px; font-size: 14px; text-align: left;
+  }
+  .options button:hover { border-color: #3c4268; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .right { color: var(--ok); }
+  .wrong { color: var(--bad); }
+  .toolbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .btn {
+    background: linear-gradient(180deg, #2a2f47, #232844); color: #e5e9ff; border: 1px solid #3a4066;
+    padding: 8px 12px; border-radius: 10px; font-size: 14px; cursor: pointer;
+  }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .hr { height: 1px; background: #222741; margin: 10px 0; }
+  .sr-only { position: absolute; left: -9999px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+/* Compact play-test HUD and motion; does not change card geometry. */
+header, .scoreboard { padding-right: 112px; }
+.scoreboard { position: relative; top: auto; z-index: auto; }
+.score-total { position: fixed; top: 12px; right: 12px; z-index: 1100; width: 76px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #14283d; color: #fff9e8; border: 2px solid #83d6af; border-radius: 14px; box-shadow: 0 3px 12px #0004; }
+.score-total span { font-size: 11px; letter-spacing: .12em; }
+.score-total strong { font-size: 32px; }
+.modal-back { box-sizing: border-box; padding-top: 96px; }
+.modal { max-height: calc(100vh - 145px); }
+.map-tools summary { cursor: pointer; font-weight: 600; padding: 5px 0; }
+.instructions-content { padding-top: 8px; }
+.page-scrolled .map-tools { position: fixed; top: 12px; left: 12px; z-index: 30; border: 1px solid #b7c9d8; border-radius: 9px; box-shadow: 0 2px 6px #0002; max-width: calc(100vw - 148px); box-sizing: border-box; }
+.page-scrolled .map-tools[open] { max-height: 65vh; overflow: auto; }
+.page-scrolled .map-tools:not([open]) summary { font-size: 0; }
+.page-scrolled .map-tools:not([open]) summary::after { content: '☰'; font-size: 22px; }
+.page-scrolled .map-tools:not([open]) summary::marker { font-size: 0; }
+.card.locked .example { padding-bottom: 0; }
+.card.locked .card-state { margin-bottom: 0; }
+.card.skip-candidate { outline: none; }
+.candidate-border { position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); overflow: visible; pointer-events: none; opacity: 0; }
+.candidate-border rect { fill: none; stroke: #13693f; stroke-width: 2; stroke-dasharray: 6 6; }
+.skip-candidate .candidate-border { opacity: 1; }
+.skip-candidate .candidate-border rect { animation: candidateMarch 4s linear infinite; }
+@keyframes candidateMarch { to { stroke-dashoffset: -48; } }
+@media (prefers-reduced-motion: reduce) { .skip-candidate .candidate-border rect { animation: none; } }
+/* Keep answer contrast rules last so earlier option styles cannot override them. */
+.options button, .options input[type="text"] { color: #fff9e8; background: #1c2033; }
+.options button:disabled, .options input:disabled { color: #fff9e8; opacity: 1; cursor: default; }
+.options input::placeholder { color: #d0cbbf; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Genre Map Game</h1>
+  <span class="pill" title="Use this version label when reporting a bug">Build 23 Sep · F</span>
+
+  <span class="pill" id="perkBadge">Perks: <strong id="perksCount">0</strong> Skip</span>
+  <span class="pill">Unlocked: <strong id="unlockedCount">0</strong></span>
+  <div class="legend pill">
+    <span class="dot" style="background: var(--genre)"></span>G · Genre
+    <span class="dot" style="background: var(--sub); margin-left:10px;"></span>SG · Sub-genre
+    <span class="dot" style="background: var(--hybrid); margin-left:10px;"></span>HG · Hybrid
+  </div>
+</header>
+<section class="scoreboard" aria-label="Your progress">
+  <div class="score-total" role="status" aria-live="polite" aria-label="Running score"><span>SCORE</span><strong id="score">0</strong></div>
+  <div class="score-progress"><label for="perkProgress" id="perkProgressLabel">9 points to your next Skip</label><progress id="perkProgress" value="0" max="9"></progress><span id="questionProgress">0 questions completed</span></div>
+  <button class="btn" id="soundToggle" aria-pressed="true">Sound: on</button>
+  <p id="scoreFeedback" role="status" aria-live="polite">Explore a card to begin. +3 first try · +1 second try.</p>
+</section>
+
+<div id="instructionsSlot">
+<details class="map-tools" id="mapInstructions" open>
+  <summary>Instructions &amp; map controls</summary>
+  <div class="instructions-content">
+  <label for="connectionFocus">Explore connections: </label>
+  <select id="connectionFocus"><option value="">All genres</option></select>
+  <label for="connectionTarget">Show link to: </label>
+  <select id="connectionTarget" disabled><option value="">All connected genres</option></select>
+  <p class="connection-key" aria-label="Connection colours"><span style="--line:#268468">Parent / derived genre</span><span style="--line:#8252b8">Hybrid mix</span><span style="--line:#237ba3">Shared conventions</span><span style="--line:#b16517">Historical influence</span></p>
+  <p id="connectionSummary">Choose a genre to highlight its direct connections.</p>
+  <p>? Question · 📖 Read and explore · ✓ Correct · ↻ Try again · ↷ Skipped · Gold outline: newly unlocked. Hover over a convention, or open its card and select the term for help.</p>
+  <p id="mapFeedback" role="status" aria-live="polite">Green solid border: answered correctly · Amber dashed: try again · Purple dashed: skipped · Grey-blue: reviewed · Gold surround: newly unlocked</p>
+</div>
+</details>
+</div>
+<div class="grid-wrap" id="gridWrap">
+  <svg id="linksSvg"></svg>
+  <div class="grid" id="grid" aria-live="polite"></div>
+</div>
+
+<div class="modal-back" id="modalBack" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal" id="modal">
+    <button class="btn" id="modalClose" style="float:right;">Close</button>
+    <h2 id="modalTitle">Title</h2>
+    <p class="modal-score" id="modalScore">Total score: 0 points</p>
+    <div class="muted" id="modalMeta"></div>
+    <div class="chips" id="modalChips"></div>
+    <p id="termDefinition" role="status"></p>
+    <p id="modalDesc"></p>
+    <div class="row">
+      <div class="example" id="modalExample"></div>
+    </div>
+    <div class="hr"></div>
+    <div class="qbox" id="qbox">
+      <div class="row" style="justify-content:space-between;">
+        <h3 style="margin:0;">Question</h3>
+        <button class="btn" id="useSkip">Use Skip perk</button>
+      </div>
+      <p class="hint" id="skipHelp"></p>
+      <p id="qPrompt"></p>
+      <div id="qOptions" class="options"></div>
+      <div id="qFeedback" class="hint" role="status" aria-live="polite"></div>
+      <div class="toolbar">
+        <span class="hint" id="unlockHint"></span>
+        <div class="row">
+          <button class="btn" id="submitText" style="display:none;">Submit</button>
+          <button class="btn" id="nextBtn" disabled>Close and continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="glossary.js"></script>
+<script>
+
+function parseCSV(text) {
+  // Simple RFC4180-ish parser supporting quotes and commas
+  const rows = [];
+  let i = 0, field = '', row = [], inQuotes = false;
+  const pushField = () => { row.push(field); field = ''; };
+  const pushRow = () => { rows.push(row); row = []; };
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i+1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      } else { field += c; i++; continue; }
+    } else {
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ',') { pushField(); i++; continue; }
+      if (c === '\n' || c === '\r') {
+        pushField(); pushRow(); i++;
+        if (c === '\r' && text[i] === '\n') i++;
+        continue;
+      }
+      else { field += c; i++; continue; }
+    }
+  }
+  if (field.length || row.length) { pushField(); pushRow(); }
+  if (inQuotes) throw new Error('Unclosed quoted CSV field.');
+  const records = rows.filter(r => r.some(value => value.trim() !== ''));
+  if (!records.length) throw new Error('CSV file is empty.');
+  const header = records.shift().map(h => h.trim());
+  if (header.some(h => !h) || new Set(header).size !== header.length) {
+    throw new Error('CSV headers must be non-empty and unique.');
+  }
+  return records.map((r, index) => {
+    if (r.length !== header.length) {
+      throw new Error(`CSV record ${index + 2} has ${r.length} fields; expected ${header.length}. Check quoted commas.`);
+    }
+    return Object.fromEntries(header.map((h, idx) => [h, r[idx].trim()]));
+  });
+}
+
+async function loadCSV(url, requiredHeaders) {
+  const res = await fetch(url, {cache: 'no-store'});
+  if (!res.ok) throw new Error(`Failed to load ${url} (HTTP ${res.status}).`);
+  try {
+    const records = parseCSV(await res.text());
+    if (!records.length) throw new Error('No data records found.');
+    for (const key of requiredHeaders) {
+      if (!(key in records[0])) throw new Error(`Missing column: ${key}.`);
+    }
+    return records;
+  } catch (error) {
+    throw new Error(`${url}: ${error.message}`);
+  }
+}
+
+const state = {
+  nodes: new Map(), // id -> node
+  edges: [], // {source, target, relation}
+  questionsByGenre: new Map(),
+  unlocked: new Set(),
+  answered: new Set(),
+  focused: null,
+  connectionTarget: null,
+  hoveredTarget: null,
+  newlyUnlocked: new Set(),
+  attempts: new Map(),
+  results: new Map(),
+  score: 0,
+  perks: 0
+};
+
+
+function typeClass(t) {
+  const k = t.toLowerCase();
+  if (k === 'genre') return 'genre';
+  if (k.startsWith('sub')) return 'sub';
+  return 'hybrid';
+}
+
+let termTip = null;
+function hideTermTip() { termTip?.remove(); termTip = null; }
+function attachTermHelp(element, term, interactive = false) {
+  const definition = typeof CONVENTION_GLOSSARY !== 'undefined' ? CONVENTION_GLOSSARY[term] : null;
+  if (!definition) return;
+  element.dataset.definition = definition;
+  const show = () => {
+    hideTermTip();
+    termTip = document.createElement('div'); termTip.className = 'term-tip';
+    termTip.textContent = `${term}: ${definition}`;
+    document.body.appendChild(termTip);
+    const r = element.getBoundingClientRect(), tip = termTip.getBoundingClientRect();
+    termTip.style.left = Math.max(8, Math.min(r.left, innerWidth - tip.width - 8)) + 'px';
+    termTip.style.top = Math.max(8, r.bottom + tip.height + 12 < innerHeight ? r.bottom + 6 : r.top - tip.height - 6) + 'px';
+  };
+  element.addEventListener('mouseenter', show);
+  element.addEventListener('mouseleave', hideTermTip);
+  if (interactive) {
+    element.setAttribute('aria-label', `${term}: ${definition}`);
+    const explain = () => { document.getElementById('termDefinition').textContent = `${term}: ${definition}`; };
+    element.addEventListener('focus', explain);
+    element.addEventListener('click', explain);
+  }
+}
+window.addEventListener('scroll', hideTermTip, true);
+window.addEventListener('resize', hideTermTip);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTermTip(); });
+
+function imdbLink(node) {
+  // Only allow verified IMDb title-page URLs supplied by the teacher.
+  if (/^https:\/\/(www\.)?imdb\.com\/title\/tt\d+\/?$/.test(node.imdb_url || '')) return node.imdb_url;
+  return 'https://www.imdb.com/find/?s=tt&q=' + encodeURIComponent(node.icon_example_title || node.title);
+}
+function makeThumbnail(node) {
+  const link = document.createElement('a'); link.className = 'thumb';
+  link.href = imdbLink(node); link.target = '_blank'; link.rel = 'noopener noreferrer';
+  const direct = link.href.includes('/title/tt');
+  const label = `${direct ? 'View' : 'Find'} ${node.icon_example_title || node.title} (${node.icon_example_year || ''}) on IMDb (opens in a new tab)`;
+  link.title = label; link.setAttribute('aria-label', label);
+  link.addEventListener('click', event => event.stopPropagation());
+  if (node.poster_thumb_url) link.style.backgroundImage = `url("${node.poster_thumb_url}")`;
+  return link;
+}
+
+function makeCard(node) {
+  const div = document.createElement('article');
+  div.className = 'card';
+  div.setAttribute('data-id', node.id);
+  div.setAttribute('aria-label', node.title);
+  div.addEventListener('click', event => { if (!event.target.closest('a')) openCard(node.id); });
+  div.addEventListener('mouseenter', () => previewConnection(node.id));
+  div.addEventListener('mouseleave', () => previewConnection(null));
+  div.addEventListener('focusin', () => previewConnection(node.id));
+  div.addEventListener('focusout', event => { if (!div.contains(event.relatedTarget)) previewConnection(null); });
+  const t = document.createElement('div');
+  t.className = 'type ' + typeClass(node.type);
+  t.textContent = {genre:'G', sub:'SG', hybrid:'HG'}[typeClass(node.type)];
+  t.title = node.type;
+  t.setAttribute('aria-label', node.type);
+  const h = document.createElement('h3');
+  h.className = 'title';
+  const open = document.createElement('button');
+  open.className = 'card-open'; open.type = 'button'; open.textContent = node.title;
+  h.appendChild(open); node._openEl = open;
+  const sub = document.createElement('p');
+  sub.className = 'subtitle';
+  sub.textContent = node.parent ? 'Sub of ' + (state.nodes.get(node.parent)?.title || node.parent) : node.type;
+  const ex = document.createElement('div');
+  ex.className = 'example';
+  const thumb = makeThumbnail(node);
+  const exMeta = document.createElement('div');
+  exMeta.innerHTML = `<strong>${node.icon_example_title || 'Example'}</strong><br><small>${node.icon_example_type || ''} ${node.icon_example_year ? ' · ' + node.icon_example_year : ''}</small>`;
+  ex.appendChild(thumb); ex.appendChild(exMeta);
+
+  const badges = document.createElement('div');
+  badges.className = 'badges';
+  const convs = (node.conventions || '').split(';').map(s => s.trim()).filter(Boolean).slice(0, 3);
+  for (const c of convs) {
+    const b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = c;
+    attachTermHelp(b, c);
+    badges.appendChild(b);
+  }
+
+  div.appendChild(t);
+  div.appendChild(h);
+  if (node.parent) div.appendChild(sub);
+  div.appendChild(badges);
+  div.appendChild(ex);
+
+  const status = document.createElement('span');
+  status.className = 'card-state';
+  ex.appendChild(status);
+  node._statusEl = status;
+  const border = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  border.setAttribute('class', 'candidate-border'); border.setAttribute('aria-hidden', 'true');
+  const perimeter = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  perimeter.setAttribute('width', '100%'); perimeter.setAttribute('height', '100%'); perimeter.setAttribute('rx', '14');
+  border.appendChild(perimeter); div.appendChild(border);
+  node._el = div;
+  return div;
+}
+
+function setLocked(node, locked) {
+  node.locked = locked;
+  node._el.classList.toggle('locked', locked);
+  node._el.disabled = locked;
+  if (node._openEl) node._openEl.disabled = locked;
+  updateCardStatus(node);
+}
+
+function updateCardStatus(node) {
+  const result = state.results.get(node.id);
+  const retry = !result && state.attempts.has(node.id);
+  const kind = result?.method || (retry ? 'retry' : '');
+  for (const key of ['answer', 'retry', 'skip', 'read']) node._el.classList.toggle('status-' + key, kind === key);
+  node._el.classList.toggle('newly-unlocked', state.newlyUnlocked.has(node.id));
+  const label = node.locked ? 'Locked' : result ? ({answer: 'Answered correctly', skip: 'Skipped', read: 'Reviewed'})[result.method] + ` · +${result.points} points` : retry ? 'Try again · ' + state.attempts.get(node.id) + ' attempt(s)' : pickQuestionFor(node.id) ? 'Question available' : 'Read and explore';
+  const symbol = node.locked ? '🔒' : result ? {answer:'✓', skip:'↷', read:'📖 ✓'}[result.method] : retry ? '↻' : pickQuestionFor(node.id) ? '?' : '📖';
+  node._statusEl.replaceChildren();
+  const icon = document.createElement('span'); icon.className = 'status-symbol'; icon.textContent = symbol; icon.setAttribute('aria-hidden', 'true'); node._statusEl.appendChild(icon);
+  const statusText = (state.newlyUnlocked.has(node.id) ? 'Newly unlocked · ' : '') + label;
+  node._statusEl.title = statusText;
+  node._statusEl.setAttribute('aria-label', statusText);
+  node._el.setAttribute('aria-label', node.title + ' — ' + node.type + ' — ' + statusText);
+  node._openEl?.setAttribute('aria-label', node.title + ' — ' + statusText);
+}
+
+function activeConnectionTarget() { return state.hoveredTarget ? null : state.connectionTarget; }
+function activeConnectionRoot() { return state.hoveredTarget || state.focused; }
+function updateConnectionLayers() {
+  const root = activeConnectionRoot(), target = activeConnectionTarget();
+  const ids = new Set(root ? target ? [root, target] : [root, ...neighboursOf(root)] : []);
+  document.getElementById('gridWrap').classList.toggle('focused', !!root);
+  for (const node of state.nodes.values()) {
+    node._el.classList.toggle('related', ids.has(node.id));
+    node._el.classList.toggle('connection-root', node.id === root);
+  }
+  redrawLinks();
+}
+function previewConnection(id) {
+  state.hoveredTarget = state.nodes.has(id) ? id : null;
+  updateConnectionLayers();
+}
+function focusConnections(id) {
+  state.focused = id || null;
+  state.connectionTarget = null;
+  state.hoveredTarget = null;
+  const target = document.getElementById('connectionTarget');
+  target.replaceChildren();
+  const all = document.createElement('option'); all.value = ''; all.textContent = 'All connected genres'; target.appendChild(all);
+  for (const neighbour of id ? neighboursOf(id) : []) {
+    const option = document.createElement('option'); option.value = neighbour; option.textContent = state.nodes.get(neighbour)?.title || neighbour; target.appendChild(option);
+  }
+  target.disabled = !id || !neighboursOf(id).length;
+  target.onchange = () => {
+    state.connectionTarget = target.value || null;
+    state.hoveredTarget = null;
+    updateConnectionLayers();
+  };
+  document.getElementById('connectionFocus').value = id || '';
+  document.getElementById('gridWrap').classList.toggle('focused', !!id);
+  const related = new Set(id ? [id, ...neighboursOf(id)] : []);
+  for (const node of state.nodes.values()) {
+    node._el.classList.toggle('related', related.has(node.id));
+    node._el.classList.toggle('selected', node.id === id);
+  }
+  const descriptions = state.edges.filter(e => e.source_id === id || e.target_id === id).map(e => {
+    const from = state.nodes.get(e.source_id)?.title, to = state.nodes.get(e.target_id)?.title;
+    const relation = {Parent: 'has sub-genre / derived genre', 'Shares-conventions': 'shares conventions with', 'Hybrid-mix': 'contributes to hybrid', 'Historical-influence': 'historically influences'}[e.relation] || e.relation;
+    return `${from} → ${relation} → ${to}`;
+  });
+  document.getElementById('connectionSummary').textContent = id ? descriptions.join(' · ') || 'No connections recorded for this genre yet.' : 'Hover over any card to see its immediate connections. Keyboard focus works too; use the selectors on touch screens.';
+  updateConnectionLayers();
+}
+
+function connectorPath(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    const sign = Math.sign(dx), x1 = a.x + sign * a.w / 2, x2 = b.x - sign * b.w / 2;
+    const bend = Math.max(24, Math.abs(x2 - x1) * .4);
+    return `M ${x1} ${a.y} C ${x1 + sign * bend} ${a.y + 12}, ${x2 - sign * bend} ${b.y + 12}, ${x2} ${b.y}`;
+  }
+  const sign = Math.sign(dy) || 1, y1 = a.y + sign * a.h / 2, y2 = b.y - sign * b.h / 2;
+  const bend = Math.max(24, Math.abs(y2 - y1) * .4);
+  // A slight sideways bow also gives vertically aligned connections a gentle curve.
+  return `M ${a.x} ${y1} C ${a.x + 12} ${y1 + sign * bend}, ${b.x + 12} ${y2 - sign * bend}, ${b.x} ${y2}`;
+}
+
+function roundedRoute(points, radius = 4) {
+  let path = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i-1], p = points[i], next = points[i+1];
+    const incoming = Math.hypot(p.x-prev.x, p.y-prev.y), outgoing = Math.hypot(next.x-p.x, next.y-p.y);
+    if (!incoming || !outgoing) continue;
+    const r = Math.min(radius, incoming/2, outgoing/2);
+    const a = {x:p.x+(prev.x-p.x)*r/incoming, y:p.y+(prev.y-p.y)*r/incoming};
+    const b = {x:p.x+(next.x-p.x)*r/outgoing, y:p.y+(next.y-p.y)*r/outgoing};
+    path += ` L ${a.x} ${a.y} Q ${p.x} ${p.y} ${b.x} ${b.y}`;
+  }
+  const end = points[points.length-1];
+  return path + ` L ${end.x} ${end.y}`;
+}
+function routedConnector(a, b, obstacles, width) {
+  // Sample the existing gentle curve. If it crosses a card, route through
+  // the grid's row gaps and outer margin instead of hiding it beneath that card.
+  const base = connectorPath(a,b);
+  const v = base.match(/-?\d+(?:\.\d+)?/g).map(Number);
+  const crosses = obstacles.some(o => {
+    for (let i=1;i<100;i++) {
+      const t=i/100,u=1-t;
+      const x=u*u*u*v[0]+3*u*u*t*v[2]+3*u*t*t*v[4]+t*t*t*v[6];
+      const y=u*u*u*v[1]+3*u*u*t*v[3]+3*u*t*t*v[5]+t*t*t*v[7];
+      if(x>o.x-o.w/2-2 && x<o.x+o.w/2+2 && y>o.y-o.h/2-2 && y<o.y+o.h/2+2) return true;
+    }
+    return false;
+  });
+  if (!crosses) return base;
+  if (Math.abs(a.y-b.y)<2) {
+    const y=Math.min(a.y-a.h/2,b.y-b.h/2)-6;
+    return roundedRoute([{x:a.x,y:a.y-a.h/2},{x:a.x,y},{x:b.x,y},{x:b.x,y:b.y-b.h/2}]);
+  }
+  const sign=Math.sign(b.y-a.y);
+  const start={x:a.x,y:a.y+sign*a.h/2}, end={x:b.x,y:b.y-sign*b.h/2};
+  const lane=(a.x+b.x)/2<width/2 ? 7 : width-7;
+  return roundedRoute([start,{x:start.x,y:start.y+sign*6},{x:lane,y:start.y+sign*6},{x:lane,y:end.y-sign*6},{x:end.x,y:end.y-sign*6},end]);
+}
+
+// Classifies emphasis; non-active edges are still rendered faintly.
+function edgeIsVisible(edge) {
+  const root = activeConnectionRoot();
+  if (!root) return true;
+  if (edge.source_id !== root && edge.target_id !== root) return false;
+  const target = activeConnectionTarget();
+  return !target || edge.source_id === target || edge.target_id === target;
+}
+function redrawLinks() {
+  const svg = document.getElementById('linksSvg');
+  const rect = document.getElementById('gridWrap').getBoundingClientRect();
+  svg.setAttribute('width', rect.width); svg.setAttribute('height', rect.height);
+  svg.replaceChildren();
+  const box = el => { const r = el.getBoundingClientRect(); return {x:r.left-rect.left+r.width/2,y:r.top-rect.top+r.height/2,w:r.width,h:r.height}; };
+  for (const e of [...state.edges].sort((a,b) => Number(edgeIsVisible(a))-Number(edgeIsVisible(b)))) {
+    const active = edgeIsVisible(e);
+    const a = state.nodes.get(e.source_id), b = state.nodes.get(e.target_id);
+    if (!a?._el || !b?._el) continue;
+    const d = connectorPath(box(a._el), box(b._el));
+    const colour = {Parent:'#268468','Hybrid-mix':'#8252b8','Shares-conventions':'#237ba3','Historical-influence':'#b16517'}[e.relation] || '#53627d';
+    const width = active ? 3 : 2;
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('opacity', active ? activeConnectionRoot() ? '1' : '.5' : '.16');
+    for (const [stroke, thickness, kind] of [['#fffaf0', width+2, 'connector-halo'], [colour, width, 'connector-line']]) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', kind);
+      path.setAttribute('d', d); path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', stroke); path.setAttribute('stroke-width', thickness);
+      path.setAttribute('stroke-linecap','round');
+      group.appendChild(path);
+    }
+    svg.appendChild(group);
+  }
+}
+
+function neighboursOf(id) {
+  const nb = new Set();
+  for (const e of state.edges) {
+    if (e.source_id === id) nb.add(e.target_id);
+    if (e.target_id === id) nb.add(e.source_id);
+  }
+  return Array.from(nb);
+}
+
+function recomputeLocks() {
+  // Rule: root genres with no parent are unlocked at start
+  // A locked node unlocks if any neighbour has been answered correctly
+  let unlockedCount = 0;
+  for (const node of state.nodes.values()) {
+    if (state.answered.has(node.id)) { setLocked(node, false); unlockedCount++; continue; }
+    if (!node.parent) { setLocked(node, false); unlockedCount++; continue; }
+    const neigh = neighboursOf(node.id);
+    const anyAnswered = neigh.some(n => state.answered.has(n));
+    setLocked(node, !anyAnswered);
+    if (!node.locked) unlockedCount++;
+  }
+  document.getElementById('unlockedCount').textContent = unlockedCount;
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  const list = Array.from(state.nodes.values());
+  // Simple grouping by type for a readable layout
+  const order = { Genre: 0, 'Sub-genre': 1, Hybrid: 2 };
+  list.sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9) || a.title.localeCompare(b.title));
+  for (const node of list) grid.appendChild(makeCard(node));
+  const select = document.getElementById('connectionFocus');
+  for (const node of list) { const option = document.createElement('option'); option.value = node.id; option.textContent = node.title; select.appendChild(option); }
+  select.onchange = () => focusConnections(select.value);
+  recomputeLocks();
+  setTimeout(redrawLinks, 0);
+}
+
+let returnFocus = null;
+function closeModal() {
+  document.body.classList.remove('modal-open');
+  document.getElementById('modalBack').style.display = 'none';
+  hideTermTip();
+  returnFocus?.focus();
+}
+function setupModal() {
+  const back = document.getElementById('modalBack');
+  document.getElementById('modalClose').onclick = closeModal;
+  back.addEventListener('click', e => { if (e.target === back) closeModal(); });
+  back.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key !== 'Tab') return;
+    const controls = [...back.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href]')].filter(el => el.getClientRects().length);
+    const first = controls[0], last = controls[controls.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  window.addEventListener('resize', redrawLinks);
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(redrawLinks).observe(document.getElementById('grid'));
+}
+
+function openCard(id) {
+  const node = state.nodes.get(id);
+  if (!node || node.locked) return;
+  for (const item of state.nodes.values()) item._el.classList.remove('skip-candidate');
+  hideTermTip();
+  returnFocus = node._openEl || node._el;
+  focusConnections(id);
+  // Fill modal
+  document.getElementById('modalTitle').textContent = node.title;
+  document.getElementById('modalMeta').textContent = `${node.type}${node.parent ? ' · Sub of ' + (state.nodes.get(node.parent)?.title || node.parent) : ''}`;
+  const chips = document.getElementById('modalChips');
+  chips.innerHTML = '';
+  document.getElementById('termDefinition').textContent = 'Select a convention for a short explanation.';
+  const convs = (node.conventions || '').split(';').map(s => s.trim()).filter(Boolean);
+  for (const c of convs) {
+    const span = document.createElement('button'); span.type = 'button'; span.className = 'chip'; span.textContent = c;
+    attachTermHelp(span, c, true); chips.appendChild(span);
+  }
+  document.getElementById('modalDesc').textContent = node.description || '';
+  const ex = document.getElementById('modalExample');
+  ex.innerHTML = '';
+  const t = makeThumbnail(node);
+  const meta = document.createElement('div'); meta.innerHTML = `<strong>${node.icon_example_title || 'Example'}</strong><br><small>${node.icon_example_type || ''} ${node.icon_example_year ? ' · ' + node.icon_example_year : ''}</small>`;
+  ex.appendChild(t); ex.appendChild(meta);
+
+  const q = pickQuestionFor(node.id);
+  const options = document.getElementById('qOptions');
+  const feedback = document.getElementById('qFeedback');
+  const submit = document.getElementById('submitText');
+  const next = document.getElementById('nextBtn');
+  const skip = document.getElementById('useSkip');
+  const completedOnOpen = isComplete(id);
+  updateScoreDisplay();
+  options.replaceChildren();
+  submit.style.display = 'none';
+  feedback.textContent = '';
+  next.textContent = 'Close and continue';
+  const refresh = () => {
+    const done = isComplete(id);
+    for (const control of options.querySelectorAll('button, input')) control.disabled = done;
+    submit.disabled = done;
+    const canChoose = done && state.perks > 0 && availableSkipQuestions().length > 0;
+    skip.disabled = state.perks <= 0 || (done ? !canChoose : !q);
+    skip.classList.toggle('skip-ready', !skip.disabled);
+    skip.classList.toggle('skip-earned', canChoose);
+    skip.textContent = canChoose ? `Choose a question to skip (${state.perks} available)` : `Use Skip (${state.perks} available)`;
+    document.getElementById('skipHelp').textContent = done ? canChoose ? 'Close this dialog and highlight available questions. Your Skip will not be spent yet.' : 'This card is complete; no Skip can be used here.' : !q ? 'Reading cards do not need a Skip.' : state.perks <= 0 ? `Earn a Skip at ${9 * (Math.floor(state.score / 9) + 1)} points. Skipping completes a question for 0 points.` : 'Use one Skip to complete this question and unlock its connections for 0 points.';
+    next.disabled = !!q && !done;
+    const result = state.results.get(id);
+    if (result) feedback.textContent = `${completedOnOpen ? 'Already completed — ' + result.points + ' points previously earned. No additional points awarded.' : (result.method === 'skip' ? 'Skipped' : result.method === 'read' ? 'Reviewed' : 'Correct') + '. +' + result.points + ' points.'} ${q?.explain || ''} ${unlockMessage(result.unlocked || [])}${state.perks > 0 ? ' You have a Skip available for another question.' : ''}`;
+    const neighbours = neighboursOf(id).map(n => state.nodes.get(n)).filter(n => n?.locked);
+    document.getElementById('unlockHint').textContent = !done && neighbours.length ? 'Completing this card unlocks: ' + neighbours.map(n => n.title).join(', ') : '';
+  };
+  const answer = value => {
+    const result = answerQuestion(id, value);
+    if (!result) return;
+    if (!result.correct) feedback.textContent = `Not quite. Try again. Attempts: ${result.attempts}. ${result.attempts === 1 ? 'A correct next answer earns 1 point.' : 'Further correct answers unlock progress for 0 points.'}`;
+    refresh();
+  };
+  document.getElementById('qPrompt').textContent = q ? q.prompt : 'Read this card, then mark it reviewed to explore its connections. No points are awarded.';
+  if (q && (q.q_type === 'MCQ' || q.q_type === 'TrueFalse')) {
+    for (const key of ['a', 'b', 'c', 'd']) {
+      if (!q[key]) continue;
+      const button = document.createElement('button');
+      button.textContent = q[key];
+      button.onclick = () => answer(key);
+      options.appendChild(button);
+    }
+  } else if (q) {
+    const input = document.createElement('input');
+    input.type = 'text'; input.placeholder = 'Type your answer';
+    input.setAttribute('aria-label', 'Your answer');
+    submit.style.display = '';
+    submit.onclick = () => { if (input.value.trim()) answer(input.value); };
+    input.onkeydown = e => { if (e.key === 'Enter') submit.click(); };
+    options.appendChild(input);
+  }
+  next.onclick = closeModal;
+  if (!q && !isComplete(id)) {
+    next.textContent = 'Mark reviewed and continue';
+    next.onclick = () => { completeCard(id, 'read', 0); closeModal(); };
+  }
+  skip.onclick = () => { if (isComplete(id)) { chooseSkipQuestion(); } else { skipQuestion(id); refresh(); } };
+  refresh();
+  document.body.classList.add('modal-open');
+  document.getElementById('modalBack').style.display = 'flex';
+  document.getElementById('modalClose').focus();
+}
+
+function normalise(s) {
+  return String(s || '').normalize('NFKC').toLowerCase().replace(/[\s\-‐‑–—]+/g, '').replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+let soundEnabled = true;
+let audioContext = null;
+function playCue(kind) {
+  if (!soundEnabled) return;
+  try {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) return;
+    audioContext ||= new Audio();
+    if (audioContext.state === 'suspended') { audioContext.resume().then(() => playCue(kind)).catch(() => {}); return; }
+    const notes = {correct:[523,659], perk:[523,659,784], unlock:[440,587], skip:[392,523], retry:[330]}[kind] || [];
+    notes.forEach((frequency,index) => {
+      const start = audioContext.currentTime + index * .10;
+      const oscillator = audioContext.createOscillator(), volume = audioContext.createGain();
+      oscillator.type='sine'; oscillator.frequency.value=frequency;
+      volume.gain.setValueAtTime(0,start);
+      volume.gain.linearRampToValueAtTime(.035,start+.015);
+      volume.gain.exponentialRampToValueAtTime(.001,start+.16);
+      oscillator.connect(volume); volume.connect(audioContext.destination);
+      oscillator.start(start); oscillator.stop(start+.18);
+      oscillator.onended=()=>{oscillator.disconnect();volume.disconnect();};
+    });
+  } catch { /* Sound must never interrupt play. */ }
+}
+function setupCompactInstructions() {
+  const instructions = document.getElementById('mapInstructions');
+  let wasScrolled = false;
+  window.addEventListener('scroll', () => {
+    const scrolled = window.scrollY > 160;
+    const slot = document.getElementById('instructionsSlot');
+    if (scrolled && !wasScrolled) slot.style.minHeight = instructions.getBoundingClientRect().height + 'px';
+    document.body.classList.toggle('page-scrolled', scrolled);
+    if (scrolled && !wasScrolled) instructions.open = false;
+    if (!scrolled) slot.style.minHeight = '';
+    wasScrolled = scrolled;
+  }, {passive:true});
+}
+function setupSound() {
+  document.getElementById('soundToggle').onclick = () => {
+    soundEnabled = !soundEnabled;
+    const button = document.getElementById('soundToggle');
+    button.textContent = soundEnabled ? 'Sound: on' : 'Sound: off';
+    button.setAttribute('aria-pressed', String(soundEnabled));
+    if (soundEnabled) playCue('correct');
+    else if (audioContext) { audioContext.close().catch(()=>{}); audioContext=null; }
+  };
+}
+function updateScoreDisplay(message = '') {
+  document.getElementById('score').textContent = state.score;
+  document.getElementById('modalScore').textContent = `Total score: ${state.score} points`;
+  document.getElementById('perkProgress').value = state.score % 9;
+  document.getElementById('perkProgressLabel').textContent = `${9-state.score%9} points to your next Skip`;
+  const total = [...state.questionsByGenre.values()].filter(list=>list.length).length;
+  const completed = [...state.results.values()].filter(result=>result.method!=='read').length;
+  document.getElementById('questionProgress').textContent = `${completed} / ${total} questions completed`;
+  if (message) document.getElementById('scoreFeedback').textContent = message;
+}
+
+function isComplete(id) { return state.answered.has(id) || state.results.has(id); }
+function answerQuestion(id, value) {
+  const node = state.nodes.get(id), q = pickQuestionFor(id);
+  if (!node || node.locked || !q || isComplete(id) || !String(value).trim()) return null;
+  const attempts = (state.attempts.get(id) || 0) + 1;
+  state.attempts.set(id, attempts);
+  const choice = q.q_type === 'MCQ' || q.q_type === 'TrueFalse';
+  const key = String(q.correct).trim().toLowerCase();
+  const expected = choice && /^[a-d]$/.test(key) ? q[key] : q.correct;
+  const correct = normalise(choice ? q[value] : value) === normalise(expected);
+  if (!correct) playCue('retry');
+  if (correct) completeCard(id, 'answer', attempts === 1 ? 3 : attempts === 2 ? 1 : 0);
+  updateCardStatus(node);
+  return {correct, attempts};
+}
+
+function availableSkipQuestions() {
+  return [...state.nodes.values()].filter(node => !node.locked && !isComplete(node.id) && pickQuestionFor(node.id));
+}
+function chooseSkipQuestion() {
+  if (state.perks <= 0) return;
+  const candidates = availableSkipQuestions();
+  if (!candidates.length) return;
+  closeModal();
+  focusConnections('');
+  for (const node of state.nodes.values()) node._el.classList.toggle('skip-candidate', candidates.includes(node));
+  document.getElementById('mapFeedback').textContent = 'Choose a green dashed question card, then select Use Skip. Your perk has not been spent.';
+  candidates[0]._openEl?.focus();
+}
+function skipQuestion(id) {
+  const node = state.nodes.get(id);
+  if (!node || node.locked || !pickQuestionFor(id) || isComplete(id) || state.perks <= 0) return false;
+  state.perks--;
+  completeCard(id, 'skip', 0);
+  return true;
+}
+
+function pickQuestionFor(genreId) {
+  const arr = state.questionsByGenre.get(genreId) || [];
+  return arr[0] || null;
+}
+
+function unlockMessage(ids) {
+  return ids.length ? 'Newly unlocked: ' + ids.map(id => state.nodes.get(id)?.title || id).join(', ') + '.' : 'No new cards unlocked; connected cards are already available.';
+}
+
+function completeCard(id, method, points) {
+  if (isComplete(id)) return;
+  const lockedBefore = new Set([...state.nodes.values()].filter(n => n.locked).map(n => n.id));
+  const before = state.score;
+  state.answered.add(id);
+  state.score += points;
+  state.perks += Math.floor(state.score / 9) - Math.floor(before / 9);
+  state.results.set(id, {questionId: pickQuestionFor(id)?.id || null, method, points, attempts: state.attempts.get(id) || 0, completedAt: new Date().toISOString()});
+  const node = state.nodes.get(id);
+  node._el.classList.add('completed');
+  node._el.setAttribute('aria-label', node.title + ' — completed');
+  document.getElementById('score').textContent = state.score;
+  document.getElementById('perksCount').textContent = state.perks;
+  document.getElementById('perkBadge').classList.toggle('perk-ready', state.perks > 0);
+  recomputeLocks();
+  const unlocked = [...lockedBefore].filter(id => !state.nodes.get(id).locked);
+  state.newlyUnlocked = new Set(unlocked);
+  state.results.get(id).unlocked = unlocked;
+  for (const item of state.nodes.values()) updateCardStatus(item);
+  const earned = Math.floor(state.score / 9) > Math.floor(before / 9);
+  document.getElementById('mapFeedback').textContent = `${earned ? 'Skip earned! ' : ''}${node.title}: ${method === 'answer' ? 'answered correctly' : method === 'skip' ? 'skipped' : 'reviewed'}. +${points} points. ${unlockMessage(unlocked)}`;
+  const announcement = `${points ? '+' + points + ' points! ' : ''}${node.title} ${method === 'answer' ? 'answered correctly' : method === 'skip' ? 'skipped' : 'reviewed'}. Total: ${state.score}.${earned ? ' Skip earned!' : ''}${unlocked.length ? ' ' + unlocked.length + ' cards unlocked.' : ''}`;
+  updateScoreDisplay(announcement);
+  playCue(earned ? 'perk' : method === 'answer' ? 'correct' : method === 'skip' ? 'skip' : 'unlock');
+  const scorePanel = document.getElementById('score').parentElement;
+  if (scorePanel && points) { scorePanel.classList.remove('reward'); void scorePanel.offsetWidth; scorePanel.classList.add('reward'); }
+  redrawLinks();
+}
+
+async function main() {
+  setupModal();
+  setupSound();
+  setupCompactInstructions();
+  const [genres, links, questions] = await Promise.all([
+    loadCSV('genres.csv', ['id', 'title', 'type', 'parent', 'poster_thumb_url']),
+    loadCSV('links.csv', ['source_id', 'target_id', 'relation']),
+    loadCSV('questions.csv', ['id', 'genre_id', 'q_type', 'prompt', 'a', 'b', 'c', 'd', 'correct', 'explain'])
+  ]);
+
+// Image paths come directly from genres.csv.
+for (const g of genres) state.nodes.set(g.id, g);
+
+// Optional: warn about missing images
+for (const g of genres) {
+  if (!g.poster_thumb_url) console.warn("No poster for:", g.icon_example_title);
+}
+
+state.edges = links;
+for (const q of questions) {
+  const arr = state.questionsByGenre.get(q.genre_id) || [];
+  arr.push(q);
+  state.questionsByGenre.set(q.genre_id, arr);
+}
+
+  // Initial answered seeds: unlock root genres but do not mark as answered
+  // Optionally pre-answer one card to start the chain
+  // state.answered.add('crime');
+
+  renderGrid();
+  updateScoreDisplay();
+}
+
+main().catch(error => {
+  console.error(error);
+  const message = document.createElement('p');
+  message.setAttribute('role', 'alert');
+  message.textContent = `The game could not load its CSV data. ${error.message} Open this folder using VS Code Live Preview → Open in Browser, and check that genres.csv, links.csv and questions.csv are beside index.html.`;
+  document.getElementById('grid').replaceChildren(message);
+});
+</script>
+</body>
+</html>

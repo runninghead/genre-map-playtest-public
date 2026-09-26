@@ -1,0 +1,9 @@
+﻿id,genre_id,q_type,prompt,a,b,c,d,correct,explain
+q1,crime_heist,MCQ,Which convention best fits the heist sub-genre?,Plan-montage,Body-swap,Found-footage,Diegetic-musical,A,Heists often use plan montages to set roles and steps.
+q2,romcom,TrueFalse,Romcoms typically resolve with reconciliation or renewed commitment.,TRUE,FALSE,,,TRUE,Closure through reconciliation is a staple convention.
+q3,horror_slasher,MCQ,Which term describes the last surviving heroine who confronts the killer?,Femme fatale,Final girl,Unreliable narrator,Mentor,B,The final girl is a recognised slasher convention.
+q4,scifi_cyberpunk,MCQ,Which pairing summarises cyberpunk’s ethos?,High-tech/low-life,Low-tech/high-life,Back-to-nature,Courtroom-drama,A,Cyberpunk explores advanced tech amid social decay.
+q5,doc,MCQ,Which device is most associated with expository documentaries?,Voice-of-God narration,Jump-scare,Meet-cute,Training-montage,A,Expository docs use authoritative narration.
+q6,crime_noir,MCQ,Which feature is most typical of classic noir?,Low-key-lighting,Found-footage,Fourth-wall asides,Song-and-dance,A,Noir iconography relies on shadow and contrast.
+q7,action_thriller,MCQ,Is Action-Thriller a hybrid or a sub-genre?,Sub-genre,Hybrid,,,B,It blends action spectacle with thriller suspense.
+q8,space_western,MCQ,Which link explains Space Western?,Western tropes in space,Documentary about ranching,Romance set on Mars,Court drama with aliens,A,It transposes frontier codes to sci-fi worlds.
